@@ -1,0 +1,14 @@
+certs/joast_pub.pem crlf
+CHANGES crlf
+CHANGES.file-find crlf
+file-finder.gemspec crlf
+.gitattributes crlf
+.gitignore crlf
+lib/file-finder.rb crlf
+lib/file/finder.rb crlf
+LICENSE crlf
+MANIFEST crlf
+Rakefile crlf
+README crlf
+.rubocop.yml crlf
+test/test_file_finder.rb crlf

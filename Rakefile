@@ -5,17 +5,17 @@ require 'rake/testtask'
 CLEAN.include("**/*.gem", "**/*.rbc", "**/link*")
 
 namespace :gem do
-  desc 'Create the file-find gem'
+  desc 'Create the file-finder gem'
   task :create => [:clean] do
     require 'rubygems/package'
-    spec = eval(IO.read('file-find.gemspec'))
+    spec = eval(IO.read('file-finder.gemspec'))
     spec.signing_key = File.join(Dir.home, '.ssh', 'gem-private_key.pem')
     Gem::Package.build(spec, true)
   end
 
-  desc "Install the file-find gem"
+  desc "Install the file-finder gem"
   task :install => [:create] do
-    ruby 'file-find.gemspec'
+    ruby 'file-finder.gemspec'
     file = Dir["*.gem"].first
     sh "gem install -l #{file}"
   end

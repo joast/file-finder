@@ -1,23 +1,41 @@
 = Description
   This is a drop-in replacement for the find module currently in the standard
-  library. It is modeled on a typical 'find' command found on most Unix systems.
+  library. It is modeled on a typical 'find' command found on most Unix
+  systems.
+
+  This is derived from file-find (https://github.com/djberg96/file-find).
+  Please, don't blame Daniel for any bugs in this.
 
 = Installation
 
-  gem install file-find
+  gem install file-finder
 
 = Synopsis
-  require 'file/find'
+  require 'file/finder'
 
-  rule = File::Find.new(
+  rule = File::Finder.new(
     :pattern => "*.rb",
     :follow  => false,
     :path    => ['/usr/local/lib', '/opt/local/lib']
   )
 
+  # Block that receives only matching file names.
   rule.find{ |f|
     puts f
   }
+
+  # Getting an array of matching file names.
+  results = rule.find
+
+  # Block that receives matching file names and File::Stat for the file.
+  rule.find do |f, s|
+    puts "#{s.size} #{f}"
+  end
+
+  # Getting an array of matching file names and File::Stat for the file.
+  # Each element of the array is an array of two elements. The first is
+  # the file name and the second is its File::Stat.
+  results = File::Find.new(:patter => '*.pas', :rtn_stat_info => true)
 
 = Rationale
   The current find module in the standard library is inadequate. It is, quite
@@ -28,30 +46,51 @@
 = Options
   * atime
   * ctime
+  * fnm_flags
   * follow
   * ftype
-  * inum
+  * full_path
   * group (name or id)
+  * inum
+  * links
   * maxdepth
   * mindepth
   * mount
   * mtime
   * name (or 'pattern')
   * path
+  * pattern
   * perm
   * prune
+  * prune_path
+  * rtn_stat_info
+  * rtn_symlinks
   * size
   * user (name or id)
 
   In addition to the above options, FileTest methods such as 'readable?' and
   'writable?' may be used as keys, with true or false for their values.
 
+  fnm_flags, full_path, prune_path, rtn_stat_info, and rtn_symlinks options
+  are unique to file-finder. All other options are from file-find.
+
   See the RDoc documentation for more details about these options.
 
-= Future Plans
-  None at this time. Please log any feature requests on the project page at:
+= Differences Between file-find and file-finder
+  Some options, like group and user, are validated during initialization
+  instead of at run-time. For example, file-find will ignore invalid
+  users/groups and treat them as not matching. file-finder will raise an
+  ArgumentError for an invalid or unknown user/group.
 
-  http://github.com/djberg96/file-find
+  file-finder uses File::fnmatch to perform name matching instead of Dir
+  globbing.
+
+= Future Plans
+  More tests. More parameter validation.
+
+  Please log any feature requests on the project page at:
+
+  http://github.com/joast/file-finder
 
 = Options I won't support
   Generally speaking, anything that would require mucking around with C code
@@ -74,11 +113,14 @@
   The :user, :group, and :inum options require the win32-file gem to work
   properly on MS Windows. However, it is not officially a dependency.
 
+  None of the changes done to create file-finder from file-find have been
+  tested on Windows.
+
 = Bugs
   None that I'm aware of beyond the ones mentioned in the Known Issues. Please
   log any bug reports on the project page at:
 
-  http://github.com/djberg96/file-find
+  http://github.com/joast/file-finder
 
 = Acknowledgements
   * Richard Clamp's File::Find::Rule Perl module for additional ideas and
@@ -93,4 +135,5 @@
   (C) 2007-2019, Daniel J. Berger, All Rights Reserved
 
 = Author
-  Daniel J. Berger
+  file-find: Daniel J. Berger
+  file-finder: Rick Ohnemus

@@ -1,12 +1,12 @@
 ######################################################################
-# test_file_find.rb
+# test_file_finder.rb
 #
-# Test case for the File::Find package. You should run this via the
+# Test case for the File::Finder package. You should run this via the
 # 'rake test' task.
 ######################################################################
 require 'test-unit'
-require 'fileutils'
-require 'file/find'
+require 'tmpdir'
+require 'file/finder'
 require 'sys/admin'
 
 if File::ALT_SEPARATOR
@@ -16,7 +16,7 @@ end
 
 include FileUtils
 
-class TC_File_Find < Test::Unit::TestCase
+class TC_File_Finder < Test::Unit::TestCase
   def self.startup
     Dir.chdir(File.dirname(File.expand_path(__FILE__)))
 
@@ -25,6 +25,7 @@ class TC_File_Find < Test::Unit::TestCase
 
     if @@windows
       @@elevated = Win32::Security.elevated_security?
+
       if @@elevated
         @@loguser = Sys::Admin.get_group("Administrators", :LocalAccount => true)
       else
@@ -43,18 +44,25 @@ class TC_File_Find < Test::Unit::TestCase
     @file_doc   = 'foo.doc'
     @directory1 = 'dir1'
     @directory2 = 'dir2'
+    @dotfile    = '.foo'
 
     File.open(@file_rb, 'w'){}
     File.open(@file_txt1, 'w'){}
     File.open(@file_txt2, 'w'){}
     File.open(@file_doc, 'w'){}
+    File.open(@dotfile, 'w'){}
 
     @link1 = 'link1'
+    @link2 = 'link2'
 
     if @@windows
-      File.symlink(@file_rb, @link1) if @@elevated
+      if @@elevated
+        File.symlink(@file_rb, @link1)
+        File.symlink(@file_txt1, @link2)
+      end
     else
       File.symlink(@file_rb, @link1)
+      File.symlink(@file_txt1, @link2)
     end
 
     Dir.mkdir(@directory1) unless File.exist?(@directory1)
@@ -63,13 +71,13 @@ class TC_File_Find < Test::Unit::TestCase
     File.open(File.join(@directory1, 'bar.txt'), 'w'){}
     File.open(File.join(@directory2, 'baz.txt'), 'w'){}
 
-    @rule1 = File::Find.new(:name => '*.txt')
-    @rule2 = File::Find.new
+    @rule1 = File::Finder.new(:name => '*.txt', :full_path => true)
+    @rule2 = File::Finder.new(:full_path => true)
   end
 
   test "version constant is set to expected value" do
-    assert_equal('0.4.2', File::Find::VERSION)
-    assert_true(File::Find::VERSION.frozen?)
+    assert_equal('0.5.0', File::Finder::VERSION)
+    assert_true(File::Finder::VERSION.frozen?)
   end
 
   test "path accessor basic functionality" do
@@ -79,6 +87,7 @@ class TC_File_Find < Test::Unit::TestCase
 
   test "path method returns expected value" do
     assert_equal(Dir.pwd, @rule1.path)
+    assert_equal('.', File::Finder.new.path)
   end
 
   test "options accessor basic functionality" do
@@ -87,7 +96,7 @@ class TC_File_Find < Test::Unit::TestCase
   end
 
   test "options method returns expected value" do
-    assert_equal({:name => '*.txt'}, @rule1.options)
+    assert_equal({:name => '*.txt', :full_path => true}, @rule1.options)
   end
 
   test "atime accessor basic functionality" do
@@ -100,8 +109,8 @@ class TC_File_Find < Test::Unit::TestCase
   end
 
   test "find with atime option works as expected" do
-    rule1 = File::Find.new(:name => "*.rb", :atime => 0)
-    rule2 = File::Find.new(:name => "*.rb", :atime => 1)
+    rule1 = File::Finder.new(:name => "*.rb", :atime => 0)
+    rule2 = File::Finder.new(:name => "*.rb", :atime => 1)
 
     assert_false(rule1.find.empty?)
     assert_true(rule2.find.empty?)
@@ -117,8 +126,8 @@ class TC_File_Find < Test::Unit::TestCase
   end
 
   test "find with ctime option works as expected" do
-    rule1 = File::Find.new(:name => "*.rb", :ctime => 0)
-    rule2 = File::Find.new(:name => "*.rb", :ctime => 1)
+    rule1 = File::Finder.new(:name => "*.rb", :ctime => 0)
+    rule2 = File::Finder.new(:name => "*.rb", :ctime => 1)
 
     assert_false(rule1.find.empty?)
     assert_true(rule2.find.empty?)
@@ -145,12 +154,12 @@ class TC_File_Find < Test::Unit::TestCase
   end
 
   test "valid filetest options work as expected" do
-    assert_nothing_raised{ File::Find.new(:readable? => true) }
-    assert_nothing_raised{ File::Find.new(:writable? => true) }
+    assert_nothing_raised{ File::Finder.new(:readable? => true) }
+    assert_nothing_raised{ File::Finder.new(:writable? => true) }
   end
 
   test "find method works with filetest option" do
-    rule = File::Find.new(:name => "*.doc", :writable? => true)
+    rule = File::Finder.new(:name => "*.doc", :writable? => true)
     File.chmod(0644, @file_doc)
 
     assert_equal([@file_doc], rule.find.map{ |f| File.basename(f) })
@@ -170,8 +179,8 @@ class TC_File_Find < Test::Unit::TestCase
   end
 
   test "find with mtime option works as expected" do
-    rule1 = File::Find.new(:name => "*.rb", :mtime => 0)
-    rule2 = File::Find.new(:name => "*.rb", :mtime => 1)
+    rule1 = File::Finder.new(:name => "*.rb", :mtime => 0)
+    rule2 = File::Finder.new(:name => "*.rb", :mtime => 1)
 
     assert_false(rule1.find.empty?)
     assert_true(rule2.find.empty?)
@@ -187,8 +196,8 @@ class TC_File_Find < Test::Unit::TestCase
   end
 
   test "ftype method works as expected" do
-    rule1 = File::Find.new(:name => "*.rb", :ftype => "file")
-    rule2 = File::Find.new(:name => "*.rb", :ftype => "characterSpecial")
+    rule1 = File::Finder.new(:name => "*.rb", :ftype => "file")
+    rule2 = File::Finder.new(:name => "*.rb", :ftype => "characterSpecial")
 
     assert_false(rule1.find.empty?)
     assert_true(rule2.find.empty?)
@@ -206,23 +215,28 @@ class TC_File_Find < Test::Unit::TestCase
   # TODO: Update test for Windows
   test "find with numeric group id works as expected" do
     omit_if(@@windows, 'group test skipped on MS Windows')
-    @rule1 = File::Find.new(:name => '*.doc', :group => @@loguser.gid)
+    @rule1 = File::Finder.new(:name => '*.doc', :group => @@loguser.gid,
+                              :full_path => true)
     assert_equal([File.expand_path(@file_doc)], @rule1.find)
   end
 
   # TODO: Update test for Windows
   test "find with string group id works as expected" do
     omit_if(@@windows, 'group test skipped on MS Windows')
-    @rule1 = File::Find.new(:name => '*.doc', :group => @@logroup.name)
+    @rule1 = File::Finder.new(:name => '*.doc', :group => @@logroup.name,
+                              :full_path => true)
     assert_equal([File.expand_path(@file_doc)], @rule1.find)
   end
 
   test "find with bogus group returns empty results" do
     omit_if(@@windows, 'group test skipped on MS Windows')
-    @rule1 = File::Find.new(:name => '*.doc', :group => 'totallybogus')
-    @rule2 = File::Find.new(:name => '*.doc', :group => 99999999)
-    assert_equal([], @rule1.find)
-    assert_equal([], @rule2.find)
+
+    assert_raise(ArgumentError) do
+      File::Finder.new(:name => '*.doc', :group => 'totallybogus')
+    end
+
+    rule2 = File::Finder.new(:name => '*.doc', :group => 99999999)
+    assert_equal([], rule2.find)
   end
 
   test "inum accessor basic functionality" do
@@ -254,8 +268,9 @@ class TC_File_Find < Test::Unit::TestCase
 
   test "links method returns expected result" do
     omit_if(@@windows && !@@elevated)
-    @rule1 = File::Find.new(:name => '*.rb', :links => 2)
-    @rule2 = File::Find.new(:name => '*.doc', :links => 1)
+    @rule1 = File::Finder.new(:name => '*.rb', :links => 2, :full_path => true)
+    @rule2 = File::Finder.new(:name => '*.doc', :links => 1,
+                              :full_path => true)
 
     assert_equal([], @rule1.find)
     assert_equal([File.expand_path(@file_doc)], @rule2.find)
@@ -281,12 +296,12 @@ class TC_File_Find < Test::Unit::TestCase
     bracket_paths.each{ |e| mkpath(e) }
     bracket_files.each{ |e| touch(e) }
 
-    @file_rule = File::Find.new(
+    @file_rule = File::Finder.new(
       :ftype => 'file',
       :path  => ['bracket']
     )
 
-    @dir_rule = File::Find.new(
+    @dir_rule = File::Finder.new(
       :path => ['bracket'],
       :ftype => 'directory'
     )
@@ -445,11 +460,16 @@ class TC_File_Find < Test::Unit::TestCase
     assert_nil(@rule1.perm)
   end
 
+  test 'perm method fails if given invalid values' do
+    assert_raise(ArgumentError){ File::Finder.new(:perm => 1.1) }
+    assert_raise(ArgumentError){ File::Finder.new(:perm => 'q-y') }
+  end
+
   test "perm method returns expected results" do
     File.chmod(0444, @file_rb)
     File.chmod(0644, @file_txt1)
 
-    results = File::Find.new(:name => "test1*", :perm => 0644).find
+    results = File::Finder.new(:name => "test1*", :perm => 0644).find
 
     assert_equal(1, results.length)
     assert_equal('test1.txt', File.basename(results.first))
@@ -460,8 +480,8 @@ class TC_File_Find < Test::Unit::TestCase
 
     File.chmod(0664, @file_rb)  # test1.rb
     File.chmod(0644, @file_txt1)  # test1.txt
-    results1 = File::Find.new(:name => "test1*", :perm => "g=rw").find
-    results2 = File::Find.new(:name => "test1*", :perm => "u=rw").find
+    results1 = File::Finder.new(:name => "test1*", :perm => "g=rw").find
+    results2 = File::Finder.new(:name => "test1*", :perm => "u=rw").find
 
     assert_equal(1, results1.length)
     assert_equal(2, results2.length)
@@ -479,7 +499,7 @@ class TC_File_Find < Test::Unit::TestCase
   end
 
   test "find method with prune option works as expected" do
-    rule = File::Find.new(:name => "*.txt", :prune => 'foo')
+    rule = File::Finder.new(:name => "*.txt", :prune => 'foo')
     assert_equal('test1.txt', File.basename(rule.find.first))
   end
 
@@ -508,21 +528,25 @@ class TC_File_Find < Test::Unit::TestCase
       uid = @@loguser.uid
     end
 
-    @rule1 = File::Find.new(:name => '*.doc', :user => uid)
+    @rule1 = File::Finder.new(:name => '*.doc', :user => uid,
+                              :full_path => true)
     assert_equal([File.expand_path(@file_doc)], @rule1.find)
   end
 
   test "user method works with string as expected" do
     omit_if(@@windows && @@elevated)
-    @rule1 = File::Find.new(:name => '*.doc', :user => @@loguser.name)
+    @rule1 = File::Finder.new(:name => '*.doc', :user => @@loguser.name,
+                              :full_path => true)
     assert_equal([File.expand_path(@file_doc)], @rule1.find)
   end
 
   test "find method with user option using invalid user returns expected results" do
-    @rule1 = File::Find.new(:name => '*.doc', :user => 'totallybogus')
-    @rule2 = File::Find.new(:name => '*.doc', :user => 99999999)
-    assert_equal([], @rule1.find)
-    assert_equal([], @rule2.find)
+    assert_raise(ArgumentError) do
+      File::Finder.new(:name => '*.doc', :user => 'totallybogus')
+    end
+
+    rule2 = File::Finder.new(:name => '*.doc', :user => 99999999)
+    assert_equal([], rule2.find)
   end
 
   test "previous method basic functionality" do
@@ -530,12 +554,113 @@ class TC_File_Find < Test::Unit::TestCase
   end
 
   test "an error is raised if the path does not exist" do
-    assert_raise(Errno::ENOENT){ File::Find.new(:path => '/bogus/dir').find }
+    assert_raise(Errno::ENOENT){ File::Finder.new(:path => '/bogus/dir').find }
   end
 
   test "an error is raised if an invalid option is passed" do
-    assert_raise(ArgumentError){ File::Find.new(:bogus => 1) }
-    assert_raise(ArgumentError){ File::Find.new(:bogus? => true) }
+    assert_raise(ArgumentError){ File::Finder.new(:bogus => 1) }
+    assert_raise(ArgumentError){ File::Finder.new(:bogus? => true) }
+  end
+
+  # TODO: Update test for Windows
+  test 'eloop handling works as expected' do
+    omit_if(@@windows, 'eloop handling test skipped on MS Windows')
+
+    begin
+      dir_eloop = ::Dir.mktmpdir
+
+      Dir.chdir(dir_eloop) do
+        File.symlink('eloop0', 'eloop1')
+        File.symlink('eloop1', 'eloop0')
+        expecting = ['./eloop0', './eloop1']
+
+        results = File::Finder.new(:path => '.', :follow => true).find
+        assert_equal(expecting, results.sort)
+
+        results = File::Finder.new(:path => '.', :follow => true,
+                                   :rtn_symlinks => true).find
+        assert_equal(expecting, results.sort)
+      end
+    ensure
+      rm_rf(dir_eloop)
+    end
+  end
+
+  test 'ArgumentError raised from find method if block has wrong number of arguments' do
+    assert_raise(ArgumentError){ File::Finder.new.find{|a,b,c|} }
+  end
+
+  test 'full_path accessor basic functionality' do
+    assert_respond_to(@rule1, :full_path)
+    assert_respond_to(@rule1, :full_path=)
+  end
+
+  test 'full_path method returns expected default value' do
+    assert_nil(File::Finder.new.full_path)
+  end
+
+  test 'fnm_flags accessor basic functionality' do
+    assert_respond_to(@rule1, :fnm_flags)
+    assert_respond_to(@rule1, :fnm_flags=)
+  end
+
+  test 'fnm_flags method returns expected default value' do
+    assert_equal(0, @rule1.fnm_flags)
+  end
+
+  test 'prune_path accessor basic functionality' do
+    assert_respond_to(@rule1, :prune_path)
+    assert_respond_to(@rule1, :prune_path=)
+  end
+
+  test 'prune_path method returns expected default value' do
+    assert_nil(@rule1.prune_path)
+  end
+
+  test 'rtn_symlinks accessor basic functionality' do
+    assert_respond_to(@rule1, :rtn_symlinks)
+    assert_respond_to(@rule1, :rtn_symlinks=)
+  end
+
+  test 'rtn_symlinks method returns expected default value' do
+    assert_nil(@rule1.rtn_symlinks)
+  end
+
+  # TODO: Update test for Windows
+  test 'find method with rtn_symlinks option works as expected' do
+    omit_if(@@windows, 'rtn_symlinks test skipped on MS Windows')
+
+    @rule1 = File::Finder.new(:name => @link1, :follow => false,
+                              :rtn_symlinks => true)
+    results = []
+    @rule1.find { |e| results << File.basename(e) }
+    assert_equal([@link1], results)
+
+    @rule2 = File::Finder.new(:name => @link1, :follow => true,
+                              :rtn_symlinks => true)
+    results = []
+    @rule2.find { |e| results << File.basename(e) }
+    assert_equal([@link1], results)
+
+    @rule3 = File::Finder.new(:name => 'link[12]', :follow => true,
+                              :rtn_symlinks => true)
+    results = []
+    @rule3.find do |e, s|
+      results << sprintf('%s-%s', s.symlink? ? 'l' : 'n', File.basename(e))
+    end
+    assert_equal(["l-#{@link1}", "n-#{@link1}",
+                  "l-#{@link2}", "n-#{@link2}"].sort,
+                 results.sort)
+  end
+
+  test 'fnmatch flags work as expected' do
+    rule = File::Finder.new(:name => '*foo*')
+    results = rule.find.map{ |f| File.basename(f) }.sort
+    assert_equal([@file_doc, @file_txt2], results)
+
+    rule = File::Finder.new(:name => '*foo*', :fnm_flags => File::FNM_DOTMATCH)
+    results = rule.find.map{ |f| File.basename(f) }.sort
+    assert_equal([@dotfile, @file_doc, @file_txt2], results)
   end
 
   def teardown
@@ -546,6 +671,8 @@ class TC_File_Find < Test::Unit::TestCase
     rm_rf(@directory1)
     rm_rf(@directory2)
     rm_rf(@link1) #unless @@windows
+    rm_rf(@link2) #unless @@windows
+    rm_rf(@dotfile)
     rm_rf('a')
     rm_rf('a1')
     rm_rf('bracket')
@@ -557,6 +684,11 @@ class TC_File_Find < Test::Unit::TestCase
     @file_txt1 = nil
     @file_txt2 = nil
     @file_doc = nil
+    @directory1 = nil
+    @directory2 = nil
+    @link1 = nil
+    @link2 = nil
+    @dotfile = nil
   end
 
   def self.shutdown
